@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tarot of Hope — Interactive Draw (Cards Centered)</title>
+  <style>
+    :root {
+      --card-w: 140px;
+      --card-h: 220px;
+      --deck-count: 15;
+      --deck-overlap: 28px;
+      --accent: #6b4fc6;
+    }
+
+    body {
+      font-family: Georgia, serif;
+      background: radial-gradient(circle at top, #0f0f1a, #000);
+mcolor: #f5f5f5;
+      margin: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #e6d2ff;
+      text-shadow: 0 0 10px #6b4fc6;
+      margin-bottom: 6px;
+    }
+    p.small {
+      color: #cfc3ff;
+      margin-top: 0;
+      margin-bottom: 14px;
+    }
+
+    .controls {
+      margin-bottom: 18px;
+    }
+    select,
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      margin: 6px;
+      border-radius: 10px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    select {
+      background: #3b2b7a;
+    }
+
+    .table {
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+      padding: 20px;
+    }
+
+    .deck-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 18px 0 10px;
+      position: relative;
+      height: calc(var(--card-h) + 8px);
+      pointer-events: auto;
+      transition: opacity 0.8s ease;
+    }
+
+    .deck-card {
+      position: absolute;
+      width: var(--card-w);
+      height: var(--card-h);
+      border-radius: 10px;
+      background: linear-gradient(145deg, #23183a, #3b2b7a);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65),
+        inset 0 0 30px rgba(255, 255, 255, 0.02);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e6d2ff;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 220ms ease, box-shadow 220ms ease,
+        opacity 400ms ease;
+    }
+    .deck-card:hover {
+      transform: translateY(-12px) scale(1.02);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      z-index: 9999;
+    }
+    .deck-card.locked {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+.deck-card.fade-out {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.9);
+  pointer-events: none;
+  transition: transform 0.6s ease, opacity 0.6s ease, filter 0.6s ease;
+}
+    .spread-area {
+      min-height: 420px;
+      position: relative;
+      margin-top: 18px;
+    }
+
+    .target {
+      position: absolute;
+      width: calc(var(--card-w) + 20px);
+      height: calc(var(--card-h) + 40px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .target .label {
+      font-size: 13px;
+      color: #d7cfff;
+      min-height: 18px;
+    }
+.target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.target .moving-card {
+  position: relative !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin-bottom: 10px;
+}
+
+.target .card-caption {
+  display: block;
+  position: relative;
+  margin-top: 8px;
+}
+
+    .moving-card {
+      position: fixed;
+      width: var(--card-w);
+      height: var(--card-h);
+      transform-origin: 50% 50%;
+      transition: left 900ms cubic-bezier(.2,.9,.25,1),
+        top 900ms cubic-bezier(.2,.9,.25,1),
+        transform 900ms cubic-bezier(.2,.9,.25,1),
+        width 450ms ease,
+        height 450ms ease,
+        opacity 400ms ease;
+      z-index: 3000;
+      border-radius: 10px;
+      overflow: visible;
+    }
+
+    .moving-card .inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 1000ms ease;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .moving-card.flipped .inner {
+      transform: rotateY(180deg);
+    }
+
+    .face {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 10px;
+    }
+    .face.back {
+      background: linear-gradient(145deg, #3b2b7a, #6b4fc6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e6d2ff;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.18);
+      font-weight: 700;
+    }
+    .face.front {
+      transform: rotateY(180deg);
+      background: #111;
+    }
+    .face.front img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 10px;
+    }
+    .face.front img.reversed {
+      transform: rotate(180deg);
+    }
+
+    .floating {
+      animation: floaty 6s ease-in-out infinite;
+    }
+    @keyframes floaty {
+      0% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-4px);
+      }
+      100% {
+        transform: translateY(0px);
+      }
+    }
+
+    .card-caption {
+      width: calc(var(--card-w) + 20px);
+      color: #e6e1ff;
+      margin-top: 6px;
+      pointer-events: none;
+    }
+    .card-caption .name {
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .card-caption .meaning {
+      color: #d6c9ff;
+      font-size: 13px;
+      min-height: 42px;
+    }
+
+    @media (max-width: 720px) {
+      :root {
+        --card-w: 110px;
+        --card-h: 180px;
+        --deck-overlap: 22px;
+      }
+      .target {
+        width: calc(var(--card-w) + 8px);
+        height: calc(var(--card-h) + 28px);
+      }
+      .card-caption {
+        width: calc(var(--card-w) + 8px);
+      }
+    }
+/* --- Ephemeral Cat Walk --- */
+.cat-walker {
+  position: fixed;
+  bottom: 40px;
+  left: -200px;
+  width: 180px;
+  height: 120px;
+  background: url("cat-walk.png") no-repeat center / contain;
+  opacity: 0.85;
+  z-index: 5000;
+  pointer-events: none;
+  animation: catWalk 4.5s linear forwards;
+}
+
+@keyframes catWalk {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(100vw + 300px));
+    opacity: 0;
+  }
+}
+
+/* hide deck + spread until cat passes */
+.deck-wrap,
+.spread-area {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+/* --- Reset Flash Image --- */
+/* --- Reset Flash Image (Enhanced) --- */
+.reset-flash {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translate(-50%, -50%) scale(0.2);
+  background: url("reset-image.png") no-repeat center / cover;
+  opacity: 0;
+  z-index: 9000;
+  pointer-events: none;
+  filter: blur(0px);
+  animation: resetFlashAnim 2.8s ease forwards;
+}
+
+/* expanded scale + slower fade */
+@keyframes resetFlashAnim {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+    filter: blur(0px);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  65% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(8.2); /* ← expands ~25% more */
+    filter: blur(0px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(9);
+    filter: blur(0px);
+  }
+}
+/* shimmer overlay */
+.reset-flash::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(255,255,255,0.25), transparent 40%),
+    radial-gradient(circle at 70% 60%, rgba(200,160,255,0.25), transparent 45%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: shimmerPulse 2.8s ease forwards;
+}
+
+@keyframes shimmerPulse {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  25% {
+    opacity: 0.6;
+  }
+  60% {
+    opacity: 0.4;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+/* background blur during reset ritual */
+body.resetting {
+  filter: none;
+  transition: none;
+}
+
+  </style>
+</head>
+<body>
+<div class="cat-walker" id="catWalker"></div>
+
+  <h1>Tarot of Hope</h1>
+  <p class="small">Click a spread, then pick cards from the stacked deck. Drawn cards will vanish and reveal themselves in the spread.</p>
+
+  <div class="controls">
+    <select id="spread">
+      <option value="single">Single Card (Insight)</option>
+      <option value="three">Three Card (Past–Present–Future)</option>
+      <option value="cross">Cross Spread</option>
+    </select>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="table">
+    <div class="deck-wrap" id="deckWrap" aria-hidden="false"></div>
+    <div id="spreadArea" class="spread-area"></div>
+  </div>
+
+  <script>
+// --- Cat intro logic ---
+window.addEventListener('load', () => {
+  const cat = document.getElementById('catWalker');
+
+  // When the cat finishes walking, reveal the deck
+  setTimeout(() => {
+    document.querySelector('.deck-wrap').style.opacity = 1;
+    document.querySelector('.spread-area').style.opacity = 1;
+    document.querySelector('.deck-wrap').style.pointerEvents = 'auto';
+    document.querySelector('.spread-area').style.pointerEvents = 'auto';
+    cat.remove();
+  }, 4600); // matches 4.5s animation
+});
+
+   const cards = [
+  // Major Arcana
+  { id: "the_fool", name: "The Fool", image: "cards/the_fool.png", upright: "Where each new chapter begins, the heart stands free of yesterday. Nothing is certain, but possibility stretches in every direction. Take the step—life is quietly preparing a place for your landing.", reversed: "Hesitation clouds the threshold. Fear not missteps; even the pause holds lessons for the journey ahead." },
+  { id: "the_magician", name: "The Magician", image: "cards/the_magician.png", upright: "He stands where will becomes word and word becomes world. The elements bow to focused intention. You are not powerless—you are learning precision.", reversed: "Potential remains, but focus wavers. Redirect attention; mastery comes with clarity and patience." },
+  { id: "the_high_priestess", name: "The High Priestess", image: "cards/the_high_priestess.png", upright: "She keeps the lunar gate, where knowing sleeps beneath silence. Not all truths arrive through action. Wait. What is concealed protects its own timing.", reversed: "Secrets demand attention. Reflection is needed; the unseen will reveal itself when you are ready to listen." },
+  { id: "the_empress", name: "The Empress", image: "cards/the_empress.png", upright: "Creation breathes through abundance. Life multiplies where care is given freely. Nourish what you love—growth follows devotion naturally.", reversed: "Neglect has obscured the fertile path. Attend to what matters; restoration comes through mindful care." },
+  { id: "the_emperor", name: "The Emperor", image: "cards/the_emperor.png", upright: "Structure anchors vision. Authority here is not domination, but responsibility claimed. Build wisely; what you establish now can endure.", reversed: "Rigidity hinders progress. Flexibility allows stability to evolve and flourish." },
+  { id: "the_hierophant", name: "The Hierophant", image: "cards/the_hierophant.png", upright: "Sacred knowledge passes through lineage and symbol. Tradition does not bind—it instructs. Learn the form so you may one day transcend it.", reversed: "Question conventions. Wisdom often hides outside the known path; insight comes when curiosity leads." },
+  { id: "the_lovers", name: "The Lovers", image: "cards/the_lovers.png", upright: "Union begins with choice. What you align yourself with shapes what you become. When desire and truth agree, harmony follows without struggle.", reversed: "Decisions linger unresolved. Reflection on heart and conscience brings clarity; love remains possible." },
+  { id: "the_chariot", name: "The Chariot", image: "cards/the_chariot.png", upright: "Opposing forces submit to disciplined will. Motion replaces doubt. Victory is not conquest—it is direction maintained.", reversed: "Momentum falters. Patience and recalibration guide you safely toward your intended course." },
+  { id: "strength", name: "Strength", image: "cards/strength.png", upright: "Gentleness tames what force cannot. Courage is quiet, steady, compassionate. You already possess the patience required.", reversed: "Confidence wavers. Inner fortitude must be called forth; compassion still has power to guide." },
+  { id: "the_hermit", name: "The Hermit", image: "cards/the_hermit.png", upright: "Withdrawal becomes illumination. Alone, but never lost, the seeker carries their own sun. What you discover inwardly will guide many outwardly.", reversed: "Isolation risks stagnation. Return to connection with measured steps; wisdom still blooms quietly." },
+  { id: "wheel_of_fortune", name: "Wheel of Fortune", image: "cards/wheel_of_fortune.png", upright: "The great mechanism turns, lifting and lowering all things. Change is not punishment—it is rhythm. Trust the cycle; this moment is not permanent.", reversed: "Resistance slows the flow. Accept that motion brings opportunity; the tide is your ally." },
+  { id: "justice", name: "Justice", image: "cards/justice.png", upright: "Truth restores balance without emotion. Every action echoes. Fairness is not cruelty—it is clarity returning order to chaos.", reversed: "Blind spots cloud judgment. Reflection and honesty restore equilibrium; fairness still awaits." },
+  { id: "the_hanged_man", name: "The Hanged Man", image: "cards/the_hanged_man.png", upright: "Suspension reveals inversion. What seemed sacrifice becomes wisdom. Let go—the universe rewards surrender with insight.", reversed: "Resistance prolongs discomfort. Acceptance opens clarity; release brings forward progress." },
+  { id: "death", name: "Death", image: "cards/death.png", upright: "Forms dissolve so essence may survive. Nothing real is lost here. Transformation clears the way for renewal.", reversed: "Change hesitates, but cannot be denied. Embrace transition; new beginnings await." },
+  { id: "temperance", name: "Temperance", image: "cards/temperance.png", upright: "Opposites blend into harmony. Healing is alchemy performed slowly. Patience refines what haste would ruin.", reversed: "Imbalance calls for adjustment. Seek moderation and gentle blending; harmony is restored gradually." },
+  { id: "the_devil", name: "The Devil", image: "cards/the_devil.png", upright: "Illusion binds only when believed. Chains loosen the moment awareness dawns. Freedom begins with recognition.", reversed: "Constraints dissolve. Awareness liberates; choice is your companion toward release." },
+  { id: "the_tower", name: "The Tower", image: "cards/the_tower.png", upright: "False structures collapse under truth’s lightning. Though sudden, the destruction is merciful. What remains is real—and ready to rebuild.", reversed: "Resistance delays clarity. Embrace necessary change; reconstruction follows insight." },
+  { id: "the_star", name: "The Star", image: "cards/the_star.png", upright: "Hope returns gently, without demand. The cosmos pours light into unseen wounds. Trust the quiet promise of renewal.", reversed: "Doubt lingers. Faith in the unseen restores hope; light persists beneath uncertainty." },
+  { id: "the_moon", name: "The Moon", image: "cards/the_moon.png", upright: "Dreams speak in riddles. Fear arises from shadows, not reality. Walk slowly—intuition knows the path even when reason falters.", reversed: "Illusions fade, revealing clarity. What was hidden now guides decisions with gentle certainty." },
+  { id: "the_sun", name: "The Sun", image: "cards/the_sun.png", upright: "Illumination restores vitality. Joy becomes strength. Nothing needs hiding now—life affirms itself through you.", reversed: "Clouds lift gradually. Even dimmed light nourishes growth; clarity is returning steadily." },
+  { id: "judgement", name: "Judgement", image: "cards/judgement.png", upright: "The call is sounded. Awakening replaces regret. Rise—what was dormant remembers its purpose.", reversed: "Recognition is delayed, yet present. Reflection reveals readiness; embrace the inner summons." },
+  { id: "the_world", name: "The World", image: "cards/the_world.png", upright: "Completion seals the work. Unity replaces separation. You stand within wholeness, prepared for another beginning.", reversed: "Cycles pause, not end. Patience and integration prepare you for the next chapter." },
+
+  // Minor Arcana — Cups
+  { id: "ace_cups", name: "Ace of Cups", image: "cards/ace_of_cups.gif", upright: "From the unseen flows renewal. The heart opens to grace, compassion, and new emotional beginnings.", reversed: "Emotional potential remains dormant. Release fears to welcome love and inspiration." },
+  { id: "two_cups", name: "Two of Cups", image: "cards/two_cups.mp4", upright: "Partnerships bloom. Mutual understanding and harmony bring warmth and connection.", reversed: "Misalignment clouds bonds. Honest communication restores unity and balance." },
+  { id: "three_cups", name: "Three of Cups", image: "cards/three_cups.mp4", upright: "Celebration of friendship and shared joy. Gratitude multiplies abundance.", reversed: "Overindulgence obscures joy. Reflect and reconnect with the meaningful." },
+  { id: "four_cups", name: "Four of Cups", image: "cards/four_cups.mp4", upright: "Contemplation of emotional fulfillment. Seek what stirs the heart beyond comfort.", reversed: "Awareness returns. Opportunity and connection await once attention lifts." },
+  { id: "five_cups", name: "Five of Cups", image: "cards/five_cups.mp4", upright: "Loss teaches resilience. Focus on what remains to restore hope.", reversed: "Perspective shifts. Gratitude for what endures unlocks healing and renewal." },
+  { id: "six_cups", name: "Six of Cups", image: "cards/six_cups.mp4", upright: "Memory and innocence bring comfort. Reconnect with joy from the past to inspire the present.", reversed: "Nostalgia may blind the present. Embrace the now to rekindle heartfelt pleasure." },
+  { id: "seven_cups", name: "Seven of Cups", image: "cards/seven_cups.mp4", upright: "Choices abound, imagination stretches. Align vision with heart to discern the right path.", reversed: "Clarity emerges. Focus on what truly matters to manifest your desires." },
+  { id: "eight_cups", name: "Eight of Cups", image: "cards/eight_cups.mp4", upright: "Departure signals growth. Walking away creates space for higher fulfillment.", reversed: "Reluctance lingers. Reflection clarifies the value of moving forward with intention." },
+  { id: "nine_cups", name: "Nine of Cups", image: "cards/nine_cups.mp4", upright: "Contentment ripens. Emotional wishes fulfilled; gratitude amplifies joy.", reversed: "Fulfillment delays, yet potential remains. Appreciate progress and small blessings." },
+  { id: "ten_cups", name: "Ten of Cups", image: "cards/ten_cups.mp4", upright: "Harmony completes the emotional cycle. Love, peace, and joy surround the heart.", reversed: "Challenges touch the cycle. Patience and care restore unity and fulfillment." },
+  { id: "page_cups", name: "Page of Cups", image: "cards/page_cups.mp4", upright: "Messages of inspiration or new feelings appear. Embrace curiosity and wonder.", reversed: "Emotions fluctuate. Reflection and mindful expression guide understanding." },
+  { id: "knight_cups", name: "Knight of Cups", image: "cards/knight_cups.mp4", upright: "Romantic pursuit and emotional exploration. Move with gentle intention.", reversed: "Overidealization clouds reality. Balance passion with grounded perception." },
+  { id: "queen_cups", name: "Queen of Cups", image: "cards/queen_cups.mp4", upright: "Compassion and intuitive guidance flourish. Care nurtures both self and others.", reversed: "Emotional boundaries blur. Reflect inwardly to maintain clarity and balance." },
+  { id: "king_cups", name: "King of Cups", image: "cards/king_cups.mp4", upright: "Mastery of emotion. Wisdom, patience, and empathy guide leadership.", reversed: "Emotional control falters. Centering and reflection restore guidance and poise." },
+
+  // Minor Arcana — Wands
+  { id: "ace_wands", name: "Ace of Wands", image: "cards/ace_wands.mp4", upright: "A spark ignites. Creativity and inspiration flow into manifestation.", reversed: "Potential awaits action. Refocus to release latent energy and drive." },
+  { id: "two_wands", name: "Two of Wands", image: "cards/two_wands.mp4", upright: "Vision meets initiative. Plan and prepare for bold action.", reversed: "Hesitation clouds foresight. Reassess options and move with intention." },
+  { id: "three_wands", name: "Three of Wands", image: "cards/three_wands.mp4", upright: "Expansion begins. Progress emerges from patient effort.", reversed: "Delays persist. Maintain focus and anticipate opportunities still forming." },
+  { id: "four_wands", name: "Four of Wands", image: "cards/four_wands.mp4", upright: "Celebration and stability manifest. Foundations solidify.", reversed: "Joy is delayed. Honor progress and prepare for eventual achievement." },
+  { id: "five_wands", name: "Five of Wands", image: "cards/five_wands.mp4", upright: "Conflict refines skill. Competition spurs growth.", reversed: "Tensions ease. Cooperation replaces discord, revealing hidden harmony." },
+  { id: "six_wands", name: "Six of Wands", image: "cards/six_wands.mp4", upright: "Victory is recognized. Achievement inspires confidence.", reversed: "Acknowledgment is delayed. Keep pursuing with diligence; success will be noticed." },
+  { id: "seven_wands", name: "Seven of Wands", image: "cards/seven_wands.mp4", upright: "Courage defends what is earned. Stand firm with integrity.", reversed: "Challenges persist. Steady resolve allows eventual triumph." },
+  { id: "eight_wands", name: "Eight of Wands", image: "cards/eight_wands.mp4", upright: "Movement accelerates. Progress arrives swiftly; opportunities align.", reversed: "Momentum stalls. Patience and attention guide the next stage." },
+  { id: "nine_wands", name: "Nine of Wands", image: "cards/nine_wands.mp4", upright: "Perseverance is strength. Boundaries protect the gains made.", reversed: "Exhaustion tests resolve. Rest and clarity preserve progress." },
+  { id: "ten_wands", name: "Ten of Wands", image: "cards/ten_wands.mp4", upright: "Burden bears wisdom. Responsibility transforms into mastery.", reversed: "Overload threatens balance. Delegate, release, and find ease." },
+  { id: "page_wands", name: "Page of Wands", image: "cards/page_wands.png", upright: "Curiosity sparks adventure. New ideas emerge; explore boldly.", reversed: "Restlessness clouds focus. Channel energy carefully to gain insight." },
+  { id: "knight_wands", name: "Knight of Wands", image: "cards/knight_wands.png", upright: "Action charges forward. Passion propels progress with courage.", reversed: "Impulsiveness risks misdirection. Pause to assess before rushing ahead." },
+  { id: "queen_wands", name: "Queen of Wands", image: "cards/queen_wands.png", upright: "Confidence and creativity radiate. Leadership inspires growth.", reversed: "Energy wavers. Reconnect with inner passion to guide others wisely." },
+  { id: "king_wands", name: "King of Wands", image: "cards/king_wands.png", upright: "Mastery of vision. Authority blends with inspiration for powerful influence.", reversed: "Control falters. Adaptation and reflection restore clarity and command." },
+
+  // Minor Arcana — Swords
+  { id: "ace_swords", name: "Ace of Swords", image: "cards/ace_swords.png", upright: "Clarity strikes. Insight and truth cut through confusion.", reversed: "Understanding delays. Patience and reflection sharpen perception." },
+  { id: "two_swords", name: "Two of Swords", image: "cards/two_swords.png", upright: "Balance in decision. Equilibrium arises from careful contemplation.", reversed: "Avoidance clouds choice. Confront matters gently to restore clarity." },
+  { id: "three_swords", name: "Three of Swords", image: "cards/three_swords.png", upright: "Heartache opens awareness. Pain teaches resilience and compassion.", reversed: "Healing begins. Forgiveness and reflection restore peace." },
+  { id: "four_swords", name: "Four of Swords", image: "cards/four_swords.png", upright: "Rest and retreat renew strength. Solitude fosters insight.", reversed: "Recovery lingers. Pause and reflection restore equilibrium." },
+  { id: "five_swords", name: "Five of Swords", image: "cards/five_swords.png", upright: "Conflict reveals clarity. Choose integrity over hollow victory.", reversed: "Truce forms. Consider perspective and reconciliation before action." },
+  { id: "six_swords", name: "Six of Swords", image: "cards/six_swords.png", upright: "Transition carries relief. Moving toward calmer waters brings hope.", reversed: "Resistance delays passage. Acceptance guides safe progress forward." },
+  { id: "seven_swords", name: "Seven of Swords", image: "cards/seven_swords.png", upright: "Strategy and subtlety navigate challenges. Cunning serves constructive ends.", reversed: "Secrets unravel. Honesty and integrity restore trust." },
+  { id: "eight_swords", name: "Eight of Swords", image: "cards/eight_swords.png", upright: "Perception binds, but freedom begins in awareness. Courage untangles restrictions.", reversed: "Clarity expands. Step forward; the path becomes visible when fear is acknowledged." },
+  { id: "nine_swords", name: "Nine of Swords", image: "cards/nine_swords.png", upright: "Anxieties speak to unhealed wounds. Reflection and action lighten the burden.", reversed: "Nightmares fade. Insight and courage dissolve lingering fear." },
+  { id: "ten_swords", name: "Ten of Swords", image: "cards/ten_swords.png", upright: "Endings clear the way for renewal. What seems final contains rebirth.", reversed: "Recovery begins. Though sharpness remains, opportunity grows from lessons learned." },
+  { id: "page_swords", name: "Page of Swords", image: "cards/page_swords.png", upright: "Curiosity seeks truth. Observation and learning sharpen understanding.", reversed: "Impatience clouds clarity. Focus and careful thought restore vision." },
+  { id: "knight_swords", name: "Knight of Swords", image: "cards/knight_swords.png", upright: "Action driven by intellect. Courage and focus advance plans.", reversed: "Impulsiveness risks error. Pause to refine direction and purpose." },
+  { id: "queen_swords", name: "Queen of Swords", image: "cards/queen_swords.png", upright: "Wisdom and discernment lead with fairness. Clarity guides decisions.", reversed: "Harshness or doubt shadows judgment. Reflection and empathy restore balance." },
+  { id: "king_swords", name: "King of Swords", image: "cards/king_swords.png", upright: "Mastery of intellect and reason. Authority is exercised with clarity.", reversed: "Decisions waver. Insight and ethical reflection regain mastery of thought." },
+
+  // Minor Arcana — Pentacles
+  { id: "ace_pentacles", name: "Ace of Pentacles", image: "cards/ace_pentacles.png", upright: "Material beginnings flourish. Prosperity and opportunity take root.", reversed: "Potential remains untapped. Careful planning and action unlock growth." },
+  { id: "two_pentacles", name: "Two of Pentacles", image: "cards/two_pentacles.png", upright: "Balance and adaptability manage multiple demands. Harmony emerges through flexibility.", reversed: "Overload obscures clarity. Prioritize and adjust to restore equilibrium." },
+  { id: "three_pentacles", name: "Three of Pentacles", image: "cards/three_pentacles.png", upright: "Collaboration fosters skill and achievement. Contribution aligns with purpose.", reversed: "Effort disperses. Focus and cooperation bring recognition and growth." },
+  { id: "four_pentacles", name: "Four of Pentacles", image: "cards/four_pentacles.png", upright: "Stability preserves resources. Stewardship strengthens security.", reversed: "Clinging inhibits flow. Release allows abundance and generosity to grow." },
+  { id: "five_pentacles", name: "Five of Pentacles", image: "cards/five_pentacles.png", upright: "Hardship teaches resilience. Support surrounds those who seek it.", reversed: "Assistance appears. Guidance and aid restore footing and hope." },
+  { id: "six_pentacles", name: "Six of Pentacles", image: "cards/six_pentacles.png", upright: "Generosity and balance give rise to abundance. Sharing nourishes all.", reversed: "Inequity calls for review. Fairness restores flow and harmony." },
+  { id: "seven_pentacles", name: "Seven of Pentacles", image: "cards/seven_pentacles.png", upright: "Patience reaps reward. Reflection strengthens investment in growth.", reversed: "Impatience clouds progress. Reevaluate goals; nurturing ensures fruition." },
+  { id: "eight_pentacles", name: "Eight of Pentacles", image: "cards/eight_pentacles.png", upright: "Mastery emerges through dedication. Skill and focus yield excellence.", reversed: "Effort scattered. Commitment and discipline cultivate expertise." },
+  { id: "nine_pentacles", name: "Nine of Pentacles", image: "cards/nine_pentacles.png", upright: "Independence and refinement flourish. Achievements bring satisfaction.", reversed: "Gratitude is overlooked. Recognize effort; prosperity is still attainable." },
+  { id: "ten_pentacles", name: "Ten of Pentacles", image: "cards/ten_pentacles.png", upright: "Legacy and abundance settle in harmony. Family and success coexist.", reversed: "Stability feels fragile. Reassess foundations to restore security." },
+  { id: "page_pentacles", name: "Page of Pentacles", image: "cards/page_pentacles.png", upright: "Learning and opportunity appear. Curiosity in practical matters brings growth.", reversed: "Study or effort delayed. Focused diligence unlocks potential." },
+  { id: "knight_pentacles", name: "Knight of Pentacles", image: "cards/knight_pentacles.png", upright: "Diligence and reliability advance progress steadily.", reversed: "Routine stagnates. Renew effort with purpose and care." },
+  { id: "queen_pentacles", name: "Queen of Pentacles", image: "cards/queen_pentacles.png", upright: "Nurturing and practical wisdom support prosperity. Abundance is shared.", reversed: "Resources mismanaged. Reflection restores harmony and provision." },
+  { id: "king_pentacles", name: "King of Pentacles", image: "cards/king_pentacles.png", upright: "Mastery of material and practical affairs. Stability and integrity guide success.", reversed: "Control wavers. Reassess priorities to reclaim grounded authority." }
+];
+
+
+    const spreadDefs = {
+      single: {
+        count: 1,
+        // center vertically for single card
+        positions: [{ xPct: 50, yPct: 50, rot: 0, label: "Insight" }]
+      },
+      three: {
+        count: 3,
+        positions: [
+          { xPct: 25, yPct: 36, rot: 0, label: "Past" },
+          { xPct: 50, yPct: 36, rot: 0, label: "Present" },
+          { xPct: 75, yPct: 36, rot: 0, label: "Future" }
+        ]
+      },
+cross: {
+  count: 5,
+  positions: [
+    { xPct: 50, yPct: 125, rot: 0, label: "Center" },
+    { xPct: 50, yPct: 20, rot: 0, label: "Above" },  // moved higher
+    { xPct: 50, yPct: 225, rot: 0, label: "Below" },  // moved lower
+    { xPct: 28, yPct: 125, rot: 0, label: "Left" },
+    { xPct: 72, yPct: 125, rot: 0, label: "Right" }
+  ]
+}
+
+    };
+
+    const deckWrap = document.getElementById('deckWrap');
+    const spreadArea = document.getElementById('spreadArea');
+    const spreadSelect = document.getElementById('spread');
+    const resetBtn = document.getElementById('reset');
+
+    let deckNodes = [];
+    let requiredCount = spreadDefs[spreadSelect.value].count;
+    let chosenCount = 0;
+    let usedCardIds = new Set();
+    let activeTargets = [];
+
+    function buildDeck(){
+      deckWrap.innerHTML = '';
+      deckNodes = [];
+      const count = 15;
+      const overlap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--deck-overlap')) || 28;
+      const cardW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-w')) || 140;
+      const totalWidth = cardW + (count - 1) * overlap;
+      deckWrap.style.width = totalWidth + 'px';
+      deckWrap.style.left = '50%';
+      deckWrap.style.transform = 'translateX(-50%)';
+
+      for(let i=0;i<count;i++){
+        const d = document.createElement('div');
+        d.className = 'deck-card';
+        const left = i * overlap;
+        d.style.left = left + 'px';
+        d.style.zIndex = 200 + i;
+        d.innerHTML = '<div style="transform:translateY(-6px)">Tarot</div><div style="font-size:11px; margin-top:6px; opacity:0.9">of Hope</div>';
+        deckWrap.appendChild(d);
+        deckNodes.push(d);
+      }
+    }
+
+    function setupTargets(){
+      spreadArea.innerHTML = '';
+      activeTargets = [];
+      const def = spreadDefs[spreadSelect.value];
+      requiredCount = def.count;
+
+      def.positions.forEach((pos, idx) => {
+        const t = document.createElement('div');
+        t.className = 'target';
+        t.dataset.index = idx;
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = pos.label;
+        label.style.opacity = 0.0;
+        t.appendChild(label);
+
+        const caption = document.createElement('div');
+        caption.className = 'card-caption';
+        caption.innerHTML = `<div class="name"></div><div class="meaning"></div>`;
+        caption.style.display = 'none';
+        t.appendChild(caption);
+
+        spreadArea.appendChild(t);
+        activeTargets.push({ node: t, pos, label, caption, occupied: false });
+      });
+
+      requestAnimationFrame(() => {
+        const rect = spreadArea.getBoundingClientRect();
+        const cardW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-w')) || 140;
+        const cardH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-h')) || 220;
+        activeTargets.forEach(ti => {
+          const left = (rect.width * (ti.pos.xPct / 100)) - (cardW / 2);
+          const top  = (rect.height * (ti.pos.yPct / 100)) - (cardH / 2);
+          ti.node.style.left = left + 'px';
+          ti.node.style.top = top + 'px';
+        });
+      });
+    }
+
+    function drawRandomCard(){
+      if(usedCardIds.size >= cards.length) usedCardIds.clear();
+      let choice;
+      do {
+        choice = cards[Math.floor(Math.random() * cards.length)];
+      } while (usedCardIds.has(choice.id) && usedCardIds.size < cards.length);
+      usedCardIds.add(choice.id);
+      return choice;
+    }
+
+    function animateDeckToTarget(deckEl, targetInfo, indexInSequence){
+      // Fade and remove the used deck card
+deckEl.classList.add('fade-out');
+const removedLeft = parseFloat(deckEl.style.left);
+deckNodes.forEach((node) => {
+  const left = parseFloat(node.style.left);
+  if (left > removedLeft) {
+    node.style.left = (left - 28) + 'px'; // 28 = deck overlap
+  }
+});
+// Wait a bit longer to allow fade-out to finish before removing
+setTimeout(() => {
+  deckEl.style.pointerEvents = 'none';
+  deckEl.style.visibility = 'hidden'; // prevents layout jump
+  deckEl.remove(); // clean up after animation
+}, 700);
+
+      const deckRect = deckEl.getBoundingClientRect();
+      const moving = document.createElement('div');
+      moving.className = 'moving-card';
+      moving.style.left = deckRect.left + 'px';
+      moving.style.top  = deckRect.top  + 'px';
+      moving.style.width = deckRect.width + 'px';
+      moving.style.height = deckRect.height + 'px';
+
+      moving.innerHTML = `
+        <div class="inner">
+          <div class="face back">Tarot of Hope</div>
+          <div class="face front"><img src="" alt=""></div>
+        </div>
+      `;
+      document.body.appendChild(moving);
+
+      const card = drawRandomCard();
+      const reversed = Math.random() < 0.5;
+      const imgEl = moving.querySelector('.face.front img');
+      imgEl.src = card.image;
+      imgEl.alt = card.name;
+      if(reversed) imgEl.classList.add('reversed'); else imgEl.classList.remove('reversed');
+
+      // absolute target rect for the flight end point (used for the glide animation)
+      const targetRect = targetInfo.node.getBoundingClientRect();
+      const cardW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-w')) || 140;
+      const cardH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-h')) || 220;
+
+      // destination in page coordinates (center the card over the target area)
+      const destLeftAbs = targetRect.left + (targetRect.width - cardW)/2;
+      const destTopAbs  = targetRect.top  + (targetRect.height - cardH)/2;
+
+      const glideDelay = 60 * indexInSequence;
+      setTimeout(() => {
+        moving.style.left = destLeftAbs + 'px';
+        moving.style.top  = destTopAbs  + 'px';
+        moving.style.width = cardW + 'px';
+        moving.style.height = cardH + 'px';
+      }, glideDelay);
+
+      const glideDuration = 950;
+      setTimeout(() => {
+        // --- key fix: when moving the animated element *into* the target node,
+        // set left/top relative to the target itself (so it centers inside the target).
+        // Compute left/top inside target coordinates:
+        const leftInTarget = (targetRect.width - cardW) / 2;
+        const topInTarget  = (targetRect.height - cardH) / 2;
+
+        // Prepare to append into the target:
+        moving.style.position = 'absolute';
+        // Use the computed values *relative to the target*:
+        moving.style.left = leftInTarget + 'px';
+        moving.style.top  = topInTarget + 'px';
+
+        // remove from body and append into target node
+        if (moving.parentElement === document.body) {
+          document.body.removeChild(moving);
+        }
+        targetInfo.node.appendChild(moving);
+
+        // reveal label and flip
+        targetInfo.label.style.opacity = 1;
+        setTimeout(() => moving.classList.add('flipped'), 220);
+
+        setTimeout(() => {
+          const nameDiv = targetInfo.caption.querySelector('.name');
+          const meaningDiv = targetInfo.caption.querySelector('.meaning');
+          nameDiv.textContent = card.name + (reversed ? ' (Reversed)' : '');
+          meaningDiv.textContent = reversed ? card.reversed : card.upright;
+          targetInfo.caption.style.display = '';
+          targetInfo.node.appendChild(targetInfo.caption);
+          moving.classList.add('floating');
+        }, 1250);
+      }, glideDuration + glideDelay + 20);
+    }
+
+    function onDeckClick(e){
+      const el = e.currentTarget;
+      if(el.classList.contains('locked')) return;
+      if(chosenCount >= requiredCount) return;
+
+      const targetInfo = activeTargets.find(t => !t.occupied);
+      if(!targetInfo) return;
+
+      el.classList.add('locked');
+      targetInfo.occupied = true;
+      animateDeckToTarget(el, targetInfo, chosenCount);
+
+      chosenCount++;
+      if(chosenCount >= requiredCount){
+        setTimeout(() => {
+          deckWrap.style.opacity = 0;
+          setTimeout(() => deckWrap.style.display = 'none', 800);
+        }, 1200);
+      }
+    }
+
+    function attachDeckHandlers(){
+      deckNodes.forEach(d => {
+        d.removeEventListener('click', onDeckClick);
+        d.addEventListener('click', onDeckClick);
+      });
+    }
+function playResetFlash() {
+  const flash = document.createElement('div');
+  flash.className = 'reset-flash';
+  document.body.appendChild(flash);
+
+  // remove after animation finishes
+  setTimeout(() => {
+    flash.remove();
+  }, 2300);
+}
+
+function resetAll(){
+  playResetFlash();
+
+  // delay actual reset until animation is mostly done
+  setTimeout(() => {
+    chosenCount = 0;
+    usedCardIds.clear();
+    deckWrap.style.display = '';
+    deckWrap.style.opacity = 1;
+    buildDeck();
+    setupTargets();
+    attachDeckHandlers();
+  }, 1200);
+}
+
+
+    function init(){
+      buildDeck();
+      setupTargets();
+      attachDeckHandlers();
+      spreadSelect.addEventListener('change', resetAll);
+      resetBtn.addEventListener('click', resetAll);
+      window.addEventListener('resize', () => setupTargets());
+    }
+
+    init();
+  </script>
+</body>
+</html>
